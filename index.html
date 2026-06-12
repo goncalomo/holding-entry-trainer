@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Holding Entry Trainer — VOR SRA</title>
+<title>Holding Entry Trainer — VOR CAS</title>
 <style>
   * { box-sizing: border-box; }
 
@@ -26,6 +26,15 @@
   header h1 {
     margin: 0;
     font-size: 20px;
+  }
+
+  header h1 a {
+    color: #ffd56b;
+    text-decoration: none;
+  }
+
+  header h1 a:hover {
+    text-decoration: underline;
   }
 
   header p {
@@ -237,8 +246,8 @@
 <body>
 
 <header>
-  <h1>Holding Entry Trainer — VOR SRA</h1>
-  <p>Method: decide the entry by comparing the <b>outbound</b> with the aircraft approach track.</p>
+  <h1>Holding Entry Trainer — VOR CAS (<a href="https://maps.app.goo.gl/TTQZdWoL1JVpyQGn9" target="_blank" rel="noopener noreferrer">Cascais, Portugal 🇵🇹</a>)</h1>
+  <p>Method: determine the entry by comparing the holding <b>outbound leg</b> with the aircraft <b>inbound track to the VOR</b>.</p>
 </header>
 
 <main>
@@ -364,29 +373,56 @@ function computeEntry(nose, outbound, turns) {
   }
 }
 
-function getToleranceNote(delta, entry) {
-  const absDelta = Math.abs(delta);
+function getToleranceNote(delta, turns, entry) {
   const tolerance = 5;
 
   let boundary = null;
   let boundaryName = "";
   let alternativeEntry = "";
 
-  if (Math.abs(absDelta - 70) <= tolerance) {
-    boundary = 70;
-    boundaryName = "Teardrop/Direct";
-    alternativeEntry = entry === "Teardrop" ? "Direct" : "Teardrop";
-  } else if (Math.abs(absDelta - 110) <= tolerance) {
-    boundary = 110;
-    boundaryName = "Parallel/Direct";
-    alternativeEntry = entry === "Parallel" ? "Direct" : "Parallel";
+  /*
+    IMPORTANT:
+    Tolerance is applied to the outbound position relative to the actual sector boundaries.
+    It is not based only on |delta| = 70° or |delta| = 110°.
+
+    Standard holding:
+      Teardrop: 0° to +70°
+      Parallel: 0° to -110°
+      Direct: outside those sectors
+
+    Non-standard holding:
+      Teardrop: 0° to -70°
+      Parallel: 0° to +110°
+      Direct: outside those sectors
+  */
+
+  if (turns === "standard") {
+    if (Math.abs(delta - 70) <= tolerance) {
+      boundary = 70;
+      boundaryName = "Teardrop/Direct";
+      alternativeEntry = entry === "Teardrop" ? "Direct" : "Teardrop";
+    } else if (Math.abs(delta - (-110)) <= tolerance) {
+      boundary = -110;
+      boundaryName = "Parallel/Direct";
+      alternativeEntry = entry === "Parallel" ? "Direct" : "Parallel";
+    }
+  } else {
+    if (Math.abs(delta - (-70)) <= tolerance) {
+      boundary = -70;
+      boundaryName = "Teardrop/Direct";
+      alternativeEntry = entry === "Teardrop" ? "Direct" : "Teardrop";
+    } else if (Math.abs(delta - 110) <= tolerance) {
+      boundary = 110;
+      boundaryName = "Parallel/Direct";
+      alternativeEntry = entry === "Parallel" ? "Direct" : "Parallel";
+    }
   }
 
-  if (!boundary) return "";
+  if (boundary === null) return "";
 
-  return "Note: This case lies within the accepted ±5° sector boundary tolerance around the "
-    + boundaryName + " boundary (" + boundary + "°). Therefore, a "
-    + alternativeEntry + " entry could also be considered acceptable.";
+  return "Note: The outbound track is within the accepted ±5° tolerance of the "
+    + boundaryName + " entry sector boundary. In this case, a "
+    + alternativeEntry + " entry may also be considered acceptable.";
 }
 
 function renderClearance() {
@@ -400,14 +436,14 @@ function renderClearance() {
 
   if (clearanceType === "inbound") {
     txt = `
-      You are approaching <b>VOR SRA</b> on track <b>${fmt(nose)}</b>.<br>
-      Clearance: "Hold at VOR SRA, <b>inbound bearing ${fmt(inbound)}</b>, ${turnsText}."<br>
+      You are approaching <b>VOR CAS</b> on track <b>${fmt(nose)}</b>.<br>
+      Clearance: "Hold at VOR CAS, <b>inbound bearing ${fmt(inbound)}</b>, ${turnsText}."<br>
       Which entry do you fly?
     `;
   } else {
     txt = `
-      You are approaching <b>VOR SRA</b> on track <b>${fmt(nose)}</b>.<br>
-      Clearance: "Hold at VOR SRA on the <b>${fmt(outbound)} radial</b>, ${turnsText}."<br>
+      You are approaching <b>VOR CAS</b> on track <b>${fmt(nose)}</b>.<br>
+      Clearance: "Hold at VOR CAS on the <b>${fmt(outbound)} radial</b>, ${turnsText}."<br>
       Which entry do you fly?
     `;
   }
@@ -469,7 +505,7 @@ function answer(choice) {
 
   document.getElementById("explanation").textContent = rule;
 
-  const toleranceNote = getToleranceNote(delta, entry);
+  const toleranceNote = getToleranceNote(delta, turns, entry);
   const toleranceEl = document.getElementById("tolerance-note");
 
   if (toleranceNote) {
@@ -581,18 +617,69 @@ function drawCompass(cx, cy, R) {
   }
 }
 
+
+function drawAircraftSymbol(x, y, angle, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle + Math.PI / 2);
+
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "#0a0f24";
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+
+  // Nose
+  ctx.moveTo(0, -16);
+
+  // Right wing and fuselage
+  ctx.lineTo(5, -3);
+  ctx.lineTo(18, 2);
+  ctx.lineTo(18, 7);
+  ctx.lineTo(4, 5);
+
+  // Tail
+  ctx.lineTo(3, 15);
+  ctx.lineTo(9, 19);
+  ctx.lineTo(9, 23);
+  ctx.lineTo(0, 18);
+  ctx.lineTo(-9, 23);
+  ctx.lineTo(-9, 19);
+  ctx.lineTo(-3, 15);
+
+  // Left wing and fuselage
+  ctx.lineTo(-4, 5);
+  ctx.lineTo(-18, 7);
+  ctx.lineTo(-18, 2);
+  ctx.lineTo(-5, -3);
+
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 function drawApproach(cx, cy, R, nose) {
   const fromBehind = bearingToCanvas(nose + 180);
+  const ahead = bearingToCanvas(nose);
+
+  const startX = cx + R * Math.cos(fromBehind);
+  const startY = cy + R * Math.sin(fromBehind);
 
   ctx.strokeStyle = "#ff3df0";
   ctx.lineWidth = 3;
 
   ctx.beginPath();
-  ctx.moveTo(cx + R * Math.cos(fromBehind), cy + R * Math.sin(fromBehind));
+  ctx.moveTo(startX, startY);
   ctx.lineTo(cx, cy);
   ctx.stroke();
 
-  const ahead = bearingToCanvas(nose);
+  // Aircraft symbol at the beginning of the approach line, pointing inbound to the VOR
+  const aircraftX = cx + R * 0.82 * Math.cos(fromBehind);
+  const aircraftY = cy + R * 0.82 * Math.sin(fromBehind);
+  drawAircraftSymbol(aircraftX, aircraftY, ahead, "#ff8df5");
+
   drawArrowHead(cx, cy, ahead, "#ff3df0");
 
   ctx.fillStyle = "#ff8df5";
@@ -630,7 +717,7 @@ function drawFix(cx, cy) {
   ctx.fillStyle = "#ffd56b";
   ctx.font = "bold 13px sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("VOR SRA", cx + 12, cy - 10);
+  ctx.fillText("VOR CAS", cx + 12, cy - 10);
 }
 
 function drawOutbound(cx, cy, R, outbound) {
