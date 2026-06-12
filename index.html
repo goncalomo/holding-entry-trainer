@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Holding Entry Trainer — VOR SRA</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0b1020;
+    color: #e6e9f2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 24px;
+    background: #11183a;
+    border-bottom: 1px solid #233068;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #9aa6d4;
+  }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding: 24px;
+    max-width: 1300px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: #131a3a;
+    border: 1px solid #233068;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .panel h2 {
+    margin-top: 0;
+    font-size: 16px;
+    color: #b9c4f0;
+  }
+
+  .clearance {
+    background: #0d1330;
+    border-left: 4px solid #5aa8ff;
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .clearance b { color: #ffd56b; }
+
+  .orientation-box {
+    margin-bottom: 14px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #0d1330;
+    border: 1px solid #233068;
+    font-size: 14px;
+  }
+
+  .orientation-box label {
+    margin-right: 16px;
+    cursor: pointer;
+  }
+
+  .orientation-box input {
+    margin-right: 6px;
+  }
+
+  .buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    flex: 1;
+    min-width: 110px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: white;
+    transition: transform .05s, filter .15s;
+  }
+
+  button:hover { filter: brightness(1.15); }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .btn-direct   { background: #5b6cff; }
+  .btn-teardrop { background: #e84a8a; }
+  .btn-parallel { background: #2fb56b; }
+  .btn-next     { background: #4a5a8a; margin-top: 14px; width: 100%; }
+
+  .result {
+    margin-top: 18px;
+    padding: 14px;
+    border-radius: 8px;
+    background: #0d1330;
+    border: 1px solid #233068;
+    display: none;
+  }
+
+  .result.ok   { border-color: #2fb56b; }
+  .result.fail { border-color: #e84a8a; }
+
+  .result h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+  }
+
+  .verdict-ok   { color: #5fe09a; }
+  .verdict-fail { color: #ff7aa8; }
+
+  .result .row {
+    margin: 4px 0;
+    font-size: 14px;
+    color: #c5cdf0;
+  }
+
+  .result .row b { color: #fff; }
+
+  .explanation {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #9aa6d4;
+    line-height: 1.45;
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #0a0f24;
+    border-radius: 10px;
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+    color: #7a85b3;
+    border-top: 1px solid #233068;
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>Holding Entry Trainer — VOR SRA</h1>
+  <p>Method: decide the entry by comparing the <b>outbound</b> with the aircraft approach track.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Exercise</h2>
+
+    <div class="clearance" id="clearance">Loading…</div>
+
+    <div class="buttons">
+      <button class="btn-direct" id="bDirect" onclick="answer('Direct')">Direct</button>
+      <button class="btn-teardrop" id="bTeardrop" onclick="answer('Teardrop')">Teardrop</button>
+      <button class="btn-parallel" id="bParallel" onclick="answer('Parallel')">Parallel</button>
+    </div>
+
+    <div class="result" id="result">
+      <h3 id="verdict"></h3>
+      <div class="row">Correct entry: <b id="r-entry"></b></div>
+      <div class="row">Inbound: <b id="r-inb"></b> &nbsp;|&nbsp; Outbound: <b id="r-out"></b></div>
+      <div class="row">Aircraft approach track: <b id="r-nose"></b></div>
+      <div class="row">Turns: <b id="r-turns"></b></div>
+      <div class="explanation" id="explanation"></div>
+      <button class="btn-next" onclick="newExercise()">Next exercise →</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>HSI / Compass Rose</h2>
+
+    <div class="orientation-box">
+      <strong>Display mode:</strong><br><br>
+      <label>
+        <input type="radio" name="orientation" value="track-up" checked onchange="setOrientation(this.value)">
+        Track-up
+      </label>
+      <label>
+        <input type="radio" name="orientation" value="north-up" onchange="setOrientation(this.value)">
+        North-up
+      </label>
+    </div>
+
+    <canvas id="cv" width="560" height="560"></canvas>
+  </section>
+</main>
+
+<footer>Developed by Gonçalo Oliveira, AWA Student — 2026</footer>
+
+<script>
+"use strict";
+
+let state = null;
+let revealed = false;
+let displayMode = "track-up";
+
+const norm360 = a => ((a % 360) + 360) % 360;
+
+function diffSigned(a, b) {
+  let d = norm360(b - a);
+  if (d > 180) d -= 360;
+  return d;
+}
+
+function fmt(a) {
+  return String(Math.round(norm360(a))).padStart(3, "0") + "°";
+}
+
+function randomBearing() {
+  return Math.floor(Math.random() * 360);
+}
+
+function setOrientation(mode) {
+  displayMode = mode;
+  drawCanvas(revealed);
+}
+
+function newExercise() {
+  revealed = false;
+
+  document.getElementById("result").style.display = "none";
+
+  ["bDirect", "bTeardrop", "bParallel"].forEach(id => {
+    document.getElementById(id).disabled = false;
+  });
+
+  const nose = randomBearing();
+  const inbound = randomBearing();
+  const outbound = norm360(inbound + 180);
+  const clearanceType = Math.random() < 0.5 ? "inbound" : "radial";
+  const turns = Math.random() < 0.5 ? "standard" : "non-standard";
+
+  const entry = computeEntry(nose, outbound, turns);
+
+  state = {
+    nose,
+    inbound,
+    outbound,
+    clearanceType,
+    turns,
+    entry
+  };
+
+  renderClearance();
+  drawCanvas(false);
+}
+
+function computeEntry(nose, outbound, turns) {
+  const delta = diffSigned(nose, outbound);
+
+  if (turns === "standard") {
+    if (delta >= 0 && delta <= 70) return "Teardrop";
+    if (delta < 0 && delta >= -110) return "Parallel";
+    return "Direct";
+  } else {
+    if (delta <= 0 && delta >= -70) return "Teardrop";
+    if (delta > 0 && delta <= 110) return "Parallel";
+    return "Direct";
+  }
+}
+
+function renderClearance() {
+  const { nose, inbound, outbound, clearanceType, turns } = state;
+
+  const turnsText = turns === "standard"
+    ? "standard holding, right turns"
+    : "non-standard holding, left turns";
+
+  let txt;
+
+  if (clearanceType === "inbound") {
+    txt = `
+      You are approaching <b>VOR SRA</b> on track <b>${fmt(nose)}</b>.<br>
+      Clearance: "Hold at VOR SRA, <b>inbound bearing ${fmt(inbound)}</b>, ${turnsText}."<br>
+      Which entry do you fly?
+    `;
+  } else {
+    txt = `
+      You are approaching <b>VOR SRA</b> on track <b>${fmt(nose)}</b>.<br>
+      Clearance: "Hold at VOR SRA on the <b>${fmt(outbound)} radial</b>, ${turnsText}."<br>
+      Which entry do you fly?
+    `;
+  }
+
+  document.getElementById("clearance").innerHTML = txt;
+}
+
+function answer(choice) {
+  if (revealed || !state) return;
+
+  revealed = true;
+
+  ["bDirect", "bTeardrop", "bParallel"].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+
+  const { nose, inbound, outbound, turns, entry, clearanceType } = state;
+  const ok = choice === entry;
+
+  const r = document.getElementById("result");
+  r.className = "result " + (ok ? "ok" : "fail");
+  r.style.display = "block";
+
+  document.getElementById("verdict").innerHTML = ok
+    ? '<span class="verdict-ok">✓ Correct!</span>'
+    : '<span class="verdict-fail">✗ Incorrect. You selected ' + choice + '.</span>';
+
+  document.getElementById("r-entry").textContent = entry;
+  document.getElementById("r-inb").textContent = fmt(inbound);
+  document.getElementById("r-out").textContent = fmt(outbound);
+  document.getElementById("r-nose").textContent = fmt(nose);
+  document.getElementById("r-turns").textContent =
+    turns === "standard" ? "Standard, right turns" : "Non-standard, left turns";
+
+  const delta = diffSigned(nose, outbound);
+  const side = delta >= 0 ? "to the right" : "to the left";
+  const absD = Math.abs(delta);
+
+  let rule = "";
+
+  if (clearanceType === "inbound") {
+    rule += "You were given the inbound bearing " + fmt(inbound) + ". ";
+    rule += "Outbound = inbound ± 180° = " + fmt(outbound) + ". ";
+  } else {
+    rule += "The radial " + fmt(outbound) + " is already the outbound, because a radial goes away from the VOR. ";
+  }
+
+  rule += "The outbound is " + absD + "° " + side + " of the aircraft approach track " + fmt(nose) + ". ";
+
+  if (turns === "standard") {
+    if (entry === "Teardrop") rule += "Standard holding: 0–70° to the right → Teardrop.";
+    else if (entry === "Parallel") rule += "Standard holding: 0–110° to the left → Parallel.";
+    else rule += "Standard holding: outside the Teardrop and Parallel sectors → Direct.";
+  } else {
+    if (entry === "Teardrop") rule += "Non-standard holding: 0–70° to the left → Teardrop.";
+    else if (entry === "Parallel") rule += "Non-standard holding: 0–110° to the right → Parallel.";
+    else rule += "Non-standard holding: outside the Teardrop and Parallel sectors → Direct.";
+  }
+
+  document.getElementById("explanation").textContent = rule;
+
+  drawCanvas(true);
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+
+function bearingToCanvas(bearing) {
+  const reference = displayMode === "track-up" && state ? state.nose : 0;
+  const relative = norm360(bearing - reference);
+  return (relative - 90) * Math.PI / 180;
+}
+
+function drawCanvas(reveal) {
+  const W = cv.width;
+  const H = cv.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const R = Math.min(W, H) * 0.42;
+
+  ctx.fillStyle = "#0a0f24";
+  ctx.fillRect(0, 0, W, H);
+
+  if (reveal && state) {
+    drawSectors(cx, cy, R, state.nose, state.turns);
+  }
+
+  drawCompass(cx, cy, R);
+
+  if (state) {
+    drawApproach(cx, cy, R, state.nose);
+  }
+
+  drawFix(cx, cy);
+
+  if (reveal && state) {
+    drawOutbound(cx, cy, R, state.outbound);
+    drawRacetrack(cx, cy, state.inbound, state.turns);
+  }
+}
+
+function drawCompass(cx, cy, R) {
+  ctx.strokeStyle = "#3a4781";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let b = 0; b < 360; b += 10) {
+    const a = bearingToCanvas(b);
+    const r1 = R;
+    const r2 = b % 30 === 0 ? R - 14 : R - 8;
+
+    ctx.strokeStyle = b % 30 === 0 ? "#6b78b8" : "#3a4781";
+    ctx.lineWidth = b % 30 === 0 ? 2 : 1;
+
+    ctx.beginPath();
+    ctx.moveTo(cx + r1 * Math.cos(a), cy + r1 * Math.sin(a));
+    ctx.lineTo(cx + r2 * Math.cos(a), cy + r2 * Math.sin(a));
+    ctx.stroke();
+
+    if (b % 30 === 0) {
+      const rl = R - 28;
+      const lx = cx + rl * Math.cos(a);
+      const ly = cy + rl * Math.sin(a);
+
+      const label =
+        b === 0 ? "N" :
+        b === 90 ? "E" :
+        b === 180 ? "S" :
+        b === 270 ? "W" :
+        String(b / 10).padStart(2, "0");
+
+      ctx.fillStyle = b % 90 === 0 ? "#ffd56b" : "#9aa6d4";
+      ctx.fillText(label, lx, ly);
+    }
+  }
+
+  if (state) {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+
+    const label = displayMode === "track-up"
+      ? "TRACK-UP — TOP = " + fmt(state.nose)
+      : "NORTH-UP";
+
+    ctx.fillText(label, cx, cy - R - 18);
+  }
+}
+
+function drawApproach(cx, cy, R, nose) {
+  const fromBehind = bearingToCanvas(nose + 180);
+
+  ctx.strokeStyle = "#ff3df0";
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+  ctx.moveTo(cx + R * Math.cos(fromBehind), cy + R * Math.sin(fromBehind));
+  ctx.lineTo(cx, cy);
+  ctx.stroke();
+
+  const ahead = bearingToCanvas(nose);
+  drawArrowHead(cx, cy, ahead, "#ff3df0");
+
+  ctx.fillStyle = "#ff8df5";
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "left";
+
+  const lx = cx + R * 0.55 * Math.cos(fromBehind) + 8;
+  const ly = cy + R * 0.55 * Math.sin(fromBehind);
+
+  ctx.fillText("Approach " + fmt(nose), lx, ly);
+}
+
+function drawArrowHead(x, y, angle, color) {
+  const size = 10;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - size * Math.cos(angle - 0.4), y - size * Math.sin(angle - 0.4));
+  ctx.lineTo(x - size * Math.cos(angle + 0.4), y - size * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawFix(cx, cy) {
+  ctx.fillStyle = "#ffd56b";
+  ctx.strokeStyle = "#0a0f24";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffd56b";
+  ctx.font = "bold 13px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("VOR SRA", cx + 12, cy - 10);
+}
+
+function drawOutbound(cx, cy, R, outbound) {
+  const a = bearingToCanvas(outbound);
+  const x1 = cx + R * 0.95 * Math.cos(a);
+  const y1 = cy + R * 0.95 * Math.sin(a);
+
+  ctx.strokeStyle = "#ffd56b";
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([8, 5]);
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "#ffd56b";
+  ctx.font = "bold 12px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("OB " + fmt(outbound), x1 + 6, y1 + 4);
+}
+
+function drawSectors(cx, cy, R, nose, turns) {
+  const cDirect = "rgba(91, 108, 255, 0.22)";
+  const cParallel = "rgba(47, 181, 107, 0.22)";
+  const cTeardrop = "rgba(232, 74, 138, 0.22)";
+
+  ctx.fillStyle = cDirect;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fill();
+
+  function wedgeRelative(relMin, relMax, color) {
+    const steps = 80;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+
+    for (let i = 0; i <= steps; i++) {
+      const rel = relMin + (relMax - relMin) * i / steps;
+      const absoluteBearing = nose + rel;
+      const a = bearingToCanvas(absoluteBearing);
+      ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+    }
+
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (turns === "standard") {
+    wedgeRelative(0, 70, cTeardrop);
+    wedgeRelative(-110, 0, cParallel);
+  } else {
+    wedgeRelative(-70, 0, cTeardrop);
+    wedgeRelative(0, 110, cParallel);
+  }
+
+  const aTop = bearingToCanvas(nose);
+  const aBottom = bearingToCanvas(nose + 180);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+  ctx.moveTo(cx + R * Math.cos(aTop), cy + R * Math.sin(aTop));
+  ctx.lineTo(cx + R * Math.cos(aBottom), cy + R * Math.sin(aBottom));
+  ctx.stroke();
+
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+
+  function lblRelative(rel, text, color) {
+    const a = bearingToCanvas(nose + rel);
+    const lx = cx + R * 0.72 * Math.cos(a);
+    const ly = cy + R * 0.72 * Math.sin(a);
+
+    ctx.fillStyle = color;
+    ctx.fillText(text, lx, ly);
+  }
+
+  if (turns === "standard") {
+    lblRelative(35, "TEARDROP", "#ff7aa8");
+    lblRelative(-55, "PARALLEL", "#5fe09a");
+    lblRelative(180, "DIRECT", "#9aa6ff");
+  } else {
+    lblRelative(-35, "TEARDROP", "#ff7aa8");
+    lblRelative(55, "PARALLEL", "#5fe09a");
+    lblRelative(180, "DIRECT", "#9aa6ff");
+  }
+}
+
+function drawRacetrack(cx, cy, inbound, turns) {
+  const legLen = 95;
+  const sep = 40;
+  const radius = sep / 2;
+
+  const aIn = bearingToCanvas(inbound);
+  const ux = Math.cos(aIn);
+  const uy = Math.sin(aIn);
+
+  const sign = turns === "standard" ? 1 : -1;
+
+  const px = -uy * sign;
+  const py = ux * sign;
+
+  const Ax = cx - ux * legLen;
+  const Ay = cy - uy * legLen;
+
+  const Fx = cx;
+  const Fy = cy;
+
+  const Bx = Fx + px * sep;
+  const By = Fy + py * sep;
+
+  const Cx = Bx - ux * legLen;
+  const Cy = By - uy * legLen;
+
+  const K1x = Fx + px * radius;
+  const K1y = Fy + py * radius;
+
+  const K2x = Ax + px * radius;
+  const K2y = Ay + py * radius;
+
+  ctx.strokeStyle = "#00e5ff";
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(Ax, Ay);
+  ctx.lineTo(Fx, Fy);
+  ctx.stroke();
+
+  const ang1Start = Math.atan2(Fy - K1y, Fx - K1x);
+  const ang1End = Math.atan2(By - K1y, Bx - K1x);
+
+  ctx.beginPath();
+  ctx.arc(K1x, K1y, radius, ang1Start, ang1End, sign < 0);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(Bx, By);
+  ctx.lineTo(Cx, Cy);
+  ctx.stroke();
+
+  const ang2Start = Math.atan2(Cy - K2y, Cx - K2x);
+  const ang2End = Math.atan2(Ay - K2y, Ax - K2x);
+
+  ctx.beginPath();
+  ctx.arc(K2x, K2y, radius, ang2Start, ang2End, sign < 0);
+  ctx.stroke();
+
+  drawArrowHead(Fx, Fy, aIn, "#00e5ff");
+
+  const aOut = bearingToCanvas(norm360(inbound + 180));
+  const midOx = (Bx + Cx) / 2;
+  const midOy = (By + Cy) / 2;
+
+  drawArrowHead(midOx - ux * 8, midOy - uy * 8, aOut, "#00e5ff");
+}
+
+newExercise();
+</script>
+
+</body>
+</html>
