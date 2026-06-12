@@ -194,6 +194,17 @@
     line-height: 1.45;
   }
 
+  .tolerance-note {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 213, 107, 0.35);
+    background: rgba(255, 213, 107, 0.08);
+    color: #ffd56b;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
   canvas {
     width: 100%;
     height: auto;
@@ -208,6 +219,17 @@
     font-size: 12px;
     color: #7a85b3;
     border-top: 1px solid #233068;
+  }
+
+  footer a {
+    color: #5aa8ff;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  footer a:hover {
+    color: #8ec5ff;
+    text-decoration: underline;
   }
 </style>
 </head>
@@ -238,6 +260,7 @@
       <div class="row">Aircraft approach track: <b id="r-nose"></b></div>
       <div class="row">Turns: <b id="r-turns"></b></div>
       <div class="explanation" id="explanation"></div>
+      <div class="tolerance-note" id="tolerance-note" style="display:none;"></div>
       <button class="btn-next" onclick="newExercise()">Next exercise →</button>
     </div>
   </section>
@@ -261,7 +284,12 @@
   </section>
 </main>
 
-<footer>Developed by Gonçalo Oliveira, AWA Student — 2026</footer>
+<footer>
+  Developed by Gonçalo Oliveira |
+  <a href="https://www.instagram.com/goncalo.mo/" target="_blank" rel="noopener noreferrer">@goncalo.mo</a> |
+  <a href="mailto:goncalodmo@gmail.com">goncalodmo@gmail.com</a> |
+  <a href="https://awa.pt/" target="_blank" rel="noopener noreferrer">AWA Student</a> (2026)
+</footer>
 
 <script>
 "use strict";
@@ -295,6 +323,7 @@ function newExercise() {
   revealed = false;
 
   document.getElementById("result").style.display = "none";
+  document.getElementById("tolerance-note").style.display = "none";
 
   ["bDirect", "bTeardrop", "bParallel"].forEach(id => {
     document.getElementById(id).disabled = false;
@@ -333,6 +362,31 @@ function computeEntry(nose, outbound, turns) {
     if (delta > 0 && delta <= 110) return "Parallel";
     return "Direct";
   }
+}
+
+function getToleranceNote(delta, entry) {
+  const absDelta = Math.abs(delta);
+  const tolerance = 5;
+
+  let boundary = null;
+  let boundaryName = "";
+  let alternativeEntry = "";
+
+  if (Math.abs(absDelta - 70) <= tolerance) {
+    boundary = 70;
+    boundaryName = "Teardrop/Direct";
+    alternativeEntry = entry === "Teardrop" ? "Direct" : "Teardrop";
+  } else if (Math.abs(absDelta - 110) <= tolerance) {
+    boundary = 110;
+    boundaryName = "Parallel/Direct";
+    alternativeEntry = entry === "Parallel" ? "Direct" : "Parallel";
+  }
+
+  if (!boundary) return "";
+
+  return "Note: This case lies within the accepted ±5° sector boundary tolerance around the "
+    + boundaryName + " boundary (" + boundary + "°). Therefore, a "
+    + alternativeEntry + " entry could also be considered acceptable.";
 }
 
 function renderClearance() {
@@ -415,6 +469,17 @@ function answer(choice) {
 
   document.getElementById("explanation").textContent = rule;
 
+  const toleranceNote = getToleranceNote(delta, entry);
+  const toleranceEl = document.getElementById("tolerance-note");
+
+  if (toleranceNote) {
+    toleranceEl.textContent = toleranceNote;
+    toleranceEl.style.display = "block";
+  } else {
+    toleranceEl.textContent = "";
+    toleranceEl.style.display = "none";
+  }
+
   drawCanvas(true);
 }
 
@@ -429,12 +494,13 @@ function bearingToCanvas(bearing) {
 
 function drawCanvas(reveal) {
   const rect = cv.getBoundingClientRect();
-  const W = rect.width;
-  const H = rect.width;
+  const W = rect.width || 560;
+  const H = W;
 
   cv.width = W * window.devicePixelRatio;
   cv.height = H * window.devicePixelRatio;
   ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
   const cx = W / 2;
   const cy = H / 2;
   const R = Math.min(W, H) * 0.42;
@@ -728,6 +794,8 @@ function drawRacetrack(cx, cy, inbound, turns) {
 
   drawArrowHead(midOx - ux * 8, midOy - uy * 8, aOut, "#00e5ff");
 }
+
+window.addEventListener("resize", () => drawCanvas(revealed));
 
 newExercise();
 </script>
