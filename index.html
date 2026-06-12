@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Holding Entry Trainer — VOR SRA</title>
 <style>
   * { box-sizing: border-box; }
@@ -45,7 +46,46 @@
   }
 
   @media (max-width: 900px) {
-    main { grid-template-columns: 1fr; }
+    main {
+      grid-template-columns: 1fr;
+      padding: 12px;
+      gap: 14px;
+    }
+
+    .panel {
+      padding: 14px;
+      border-radius: 10px;
+    }
+
+    header {
+      padding: 14px 16px;
+    }
+
+    header h1 {
+      font-size: 18px;
+    }
+
+    header p {
+      font-size: 12px;
+    }
+
+    .buttons {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    button {
+      width: 100%;
+      min-width: unset;
+    }
+
+    .orientation-box {
+      font-size: 13px;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
   }
 
   .panel {
@@ -388,8 +428,13 @@ function bearingToCanvas(bearing) {
 }
 
 function drawCanvas(reveal) {
-  const W = cv.width;
-  const H = cv.height;
+  const rect = cv.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.width;
+
+  cv.width = W * window.devicePixelRatio;
+  cv.height = H * window.devicePixelRatio;
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
   const cx = W / 2;
   const cy = H / 2;
   const R = Math.min(W, H) * 0.42;
